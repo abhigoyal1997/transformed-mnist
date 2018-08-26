@@ -12,8 +12,8 @@ class CNN(nn.Module):
     def __init__(self, input_shape=(1, 128, 128), dropout=0.25, num_classes=10):
         super(CNN, self).__init__()
 
-        self.conv1 = nn.Conv2d(1, 6, 5)
-        self.conv2 = nn.Conv2d(6, 16, 5)
+        self.conv1 = nn.Conv2d(1, 12, 5)
+        self.conv2 = nn.Conv2d(12, 64, 5)
 
         self.max_pool = nn.MaxPool2d((5, 5))
 
@@ -23,9 +23,9 @@ class CNN(nn.Module):
         output_feat = self._forward_features(input, False)
         self.num_flat_features = output_feat.data.view(1, -1).size(1)
 
-        self.fc1 = nn.Linear(self.num_flat_features, 120)
-        self.fc2 = nn.Linear(120, 84)
-        self.fc3 = nn.Linear(84, num_classes)
+        self.fc1 = nn.Linear(self.num_flat_features, 480)
+        self.fc2 = nn.Linear(480, 150)
+        self.fc3 = nn.Linear(150, num_classes)
 
         self.fc_dropout = nn.Dropout(2*dropout)
 
@@ -47,6 +47,8 @@ class CNN(nn.Module):
         x = x.view(-1, self.num_flat_features)
 
         x = F.relu(self.fc1(x))
+        # if self.train:
+        #     x = self.fc_dropout(x)
         x = F.relu(self.fc2(x))
         if self.train:
             x = self.fc_dropout(x)
