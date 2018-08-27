@@ -74,7 +74,7 @@ class CNN(nn.Module):
 class AGCNN(nn.Module):
 
     def __init__(self, input_shape=(1, 128, 128), dropout=0.25, num_classes=10, backbone='cnn', threshold=0.2):
-        super(CNN, self).__init__()
+        super(AGCNN, self).__init__()
         self.threshold = threshold
 
         if backbone == 'cnn':
@@ -91,18 +91,37 @@ class AGCNN(nn.Module):
     def forward(self, x):
         x1 = self.global_branch.down_sample(x)
 
+        mask, heatmap = get_attention_mask(x, self.threshold)
+        attention_xy = get_attention_xy(mask)
+        x = get_attention_img(x, attention_xy)
 
-def get_attention_mask(x, thre):
+        x2 = self.local_branch.down_sample(x)
 
+        x1 = self.global_branch.max_pool(x1)
+        x2 = self.local_branch.max_pool(x2)
+
+        x = torch.cat((x1, x2), 1)
+        x = x.view(x.size(0), -1)
+        x = self.fc1(x)
+        return x
+
+    def _get_local_img(self, x):
+        x1 = self.global_branch.down_sample(x)
+
+        mask, heatmap = get_attention_mask(x, self.threshold)
+        attention_xy = get_attention_xy(mask)
+        x = get_attention_img(x, attention_xy)
+        return x
+
+
+def get_attention_mask(x, threshold):
     x = torch.abs(x)
     heatmap, _ = torch.max(x, dim=1, keepdim=True)
-    mask = F.upsample(heatmap, scale_factor=32, mode='bilinear')
-    mask_max, _ = mask.max(dim=2, keepdim=True)
-    mask_max, _ = mask_max.max(dim=3, keepdim=True)
+    mask = F.interpolate(heatmap, scale_factor=x.size(2)/heatmap.size(2), mode='bilinear', align_corners=True)
+    mask_max = torch.max(mask)
     mask_max = mask_max.expand(mask.size())
     mask = mask / mask_max
-    mask = torch.ge(mask, thre)
-
+    mask = torch.ge(mask, threshold)
     return (mask.data).cpu().numpy(), heatmap
 
 
@@ -113,13 +132,12 @@ def get_attention_xy(mask):
     for i in range(mask_shape[0]):
         this_mask = mask[i, :, :, :]
         this_mask = this_mask.reshape(mask_shape[2], mask_shape[3])
-        contours = cv2.findContours(this_mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        contours = cv.findContours(this_mask, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
         attention_xy[i, :] = find_attention_xy(contours)
     return attention_xy
 
 
 def find_attention_xy(contours):
-
     size = 0
     tx, ty, bx, by = 0, 0, 0, 0
     for cnt in contours[1]:
@@ -137,13 +155,13 @@ def get_attention_img(img, attention_xy):
     samples = attention_xy.shape[0]
     for i in range(samples):
         tx, ty, bx, by = attention_xy[i, :]
-        if tx == 0 and ty == 0 and bx == 0 and by ==0:
+        if tx == 0 and ty == 0 and bx == 0 and by == 0:
             this_attention_img = img[i, :, :, :]
         else:
             this_attention_img = img[i, :, int(ty):int(by), int(tx):int(bx)]
 
         this_attention_img = torch.unsqueeze(this_attention_img, 0)
-        this_attention_img = F.upsample(this_attention_img, size=(img.size()[2], img.size()[3]), mode='bilinear')
+        this_attention_img = F.interpolate(this_attention_img, size=(img.size()[2], img.size()[3]), mode='bilinear', align_corners=True)
 
         if i == 0:
             attention_img = this_attention_img
