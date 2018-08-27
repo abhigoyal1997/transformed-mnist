@@ -82,9 +82,12 @@ class AGCNN(nn.Module):
             self.local_branch = CNN(input_shape=input_shape, dropout=dropout, num_classes=num_classes)
 
         self.num_flat_features = self.global_branch.num_flat_features + self.local_branch.num_flat_features
-        self.fc1 = nn.Linear(self.num_flat_features, self.global_branch.fc1.out_features)
-        self.fc1 = nn.Linear(self.global_branch.fc2.in_features, self.global_branch.fc2.out_features)
-        self.fc3 = nn.Linear(self.global_branch.fc3.in_features, num_classes)
+
+        fc1 = nn.Linear(self.num_flat_features, self.global_branch.fc1.out_features)
+        fc2 = nn.Linear(self.global_branch.fc2.in_features, self.global_branch.fc2.out_features)
+        fc3 = nn.Linear(self.global_branch.fc3.in_features, num_classes)
+
+        self.fc_modules = nn.ModuleList([fc1, fc2, fc3])
 
         self.fc_dropout = nn.Dropout(2*dropout)
 
@@ -102,7 +105,9 @@ class AGCNN(nn.Module):
 
         x = torch.cat((x1, x2), 1)
         x = x.view(x.size(0), -1)
-        x = self.fc1(x)
+        for layer in self.fc_modules[:-1]:
+            x = F.relu(layer(x))
+        x = self.fc_modules[-1](x)
         return x
 
     def _get_local_img(self, x):
@@ -112,6 +117,16 @@ class AGCNN(nn.Module):
         attention_xy = get_attention_xy(mask)
         x = get_attention_img(x, attention_xy)
         return x
+
+    def set_train_branch(self, branch):
+        if branch == 'fusion':
+            for p in self.global_branch.parameters():
+                p.requires_grad = False
+            for p in self.local_branch.parameters():
+                p.requires_grad = False
+            for l in self.fc_modules:
+                for p in l.parameters():
+                    p.requires_grad = True
 
 
 def get_attention_mask(x, threshold):
