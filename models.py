@@ -58,6 +58,8 @@ class CNN(nn.Module):
 
     def visualise_features(self, x, max_only=False):
         f = self._forward_features(x, False)
+        if f.device.type == 'cuda':
+            f = f.cpu()
         if max_only:
             f = np.max(f[0].numpy(), axis=0)
             f = cv.resize(f, x[0][0].shape)
