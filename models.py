@@ -47,8 +47,6 @@ class CNN(nn.Module):
         x = x.view(-1, self.num_flat_features)
 
         x = F.relu(self.fc1(x))
-        # if self.train:
-        #     x = self.fc_dropout(x)
         x = F.relu(self.fc2(x))
         if self.train:
             x = self.fc_dropout(x)
