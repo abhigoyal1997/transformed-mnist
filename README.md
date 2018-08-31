@@ -7,7 +7,7 @@ Analysis of different CNN models on a randomly scaled and translated MNIST datas
 These models have been trained on 10000 images from official training split of MNIST after random scaling and translation using a Multi-Label-Soft-Margin loss. The results are reported as average F1-score of prediction on the official 10000 test images from MNIST after random scale and translation.
 
 1. 2 Convolution layers followed by 3 Dense layers: ~0.730
-2. A model similar to AG-CNN trained on the same:
+2. A model similar to AG-CNN:
     * Global branch (the model mentioned above): ~0.730
     * Local branch using localized images: ~0.938
     * Fused Global and Local branch: ~0.957
